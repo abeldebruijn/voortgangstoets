@@ -21,7 +21,7 @@ export default defineSchema({
     feedback: v.optional(v.string()),
     feedbackPrompt: v.optional(v.string()),
     exam: v.id("exams"),
-    help: v.optional(v.record(v.string())), // {A: string, B: string}
+    help: v.optional(v.record(v.string(), v.string())), // {A: string, B: string}
   }),
 
   practiceSessions: defineTable({
