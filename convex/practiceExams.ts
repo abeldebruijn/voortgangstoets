@@ -189,7 +189,7 @@ function pickQuestionIds(args: {
 
   const selected = preferred.slice(0, questionAmount);
 
-  if (selected.length >= questionAmount) {
+  if (selected.length >= questionAmount || selectionMode === "sameQuestions") {
     return selected;
   }
 
@@ -630,9 +630,11 @@ export const submitAnswer = mutation({
       retryCount: practiceExamQuestion.retryCount + (isCorrect ? 0 : 1),
       attemptCount: nextAttemptCount,
       isLocked: shouldLock,
-      ...(feedbackText ? { feedbackText } : {}),
-      ...(feedbackSource ? { feedbackSource } : {}),
-      ...(!isCorrect ? { feedbackForOptionIndex: args.selectedOptionIndex } : {}),
+      feedbackText: feedbackText ?? undefined,
+      feedbackSource: feedbackSource ?? undefined,
+      feedbackForOptionIndex: !isCorrect
+        ? args.selectedOptionIndex
+        : undefined,
     });
 
     const existingUserQuestionStat = await ctx.db
