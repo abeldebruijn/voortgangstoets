@@ -233,15 +233,39 @@ function pickQuestionIds(args: {
   const selected = preferred.slice(0, questionAmount);
 
   if (selected.length >= questionAmount || selectionMode === "sameQuestions") {
-    return selected;
+    return selected.length >= questionAmount
+      ? selected
+      : padQuestionIds(selected, preferred, questionAmount);
   }
 
   const selectedSet = new Set(selected);
   const backfill = shuffle(
     allQuestionIds.filter((questionId) => !selectedSet.has(questionId)),
   );
+  const uniqueResult = [...selected, ...backfill].slice(0, questionAmount);
 
-  return [...selected, ...backfill].slice(0, questionAmount);
+  return uniqueResult.length >= questionAmount
+    ? uniqueResult
+    : padQuestionIds(uniqueResult, uniqueResult, questionAmount);
+}
+
+function padQuestionIds(
+  questionIds: Id<"questions">[],
+  pool: Id<"questions">[],
+  questionAmount: number,
+) {
+  const next = [...questionIds];
+
+  if (pool.length === 0) {
+    return next;
+  }
+
+  while (next.length < questionAmount) {
+    const randomIndex = Math.floor(Math.random() * pool.length);
+    next.push(pool[randomIndex]);
+  }
+
+  return next;
 }
 
 async function insertPracticeExam(
@@ -492,7 +516,11 @@ export const retryPracticeExam = mutation({
 
     const originalRows = await getPracticeExamQuestionRows(ctx, originalPracticeExam._id);
     const previousQuestionIds = originalRows.map((row) => row.question);
-    const boundedQuestionAmount = clamp(args.questionAmount, 1, questions.length);
+    const boundedQuestionAmount = clamp(
+      args.questionAmount,
+      1,
+      Math.max(questions.length, previousQuestionIds.length),
+    );
     const statsByQuestionId = new Map<Id<"questions">, Doc<"userQuestionStats">>();
 
     if (args.otherQuestions) {
