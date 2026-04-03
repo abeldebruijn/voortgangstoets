@@ -9,7 +9,7 @@ export default function nav() {
           <h1 className="text-lg font-semibold">Voortgangstoets</h1>
         </div>
         <Authenticated>
-          <UserButton />
+          <UserButton afterSignOutUrl="/" />
         </Authenticated>
       </div>
     </header>
