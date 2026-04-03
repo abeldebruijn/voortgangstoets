@@ -93,6 +93,49 @@ async function getOwnedPracticeExam(
   return practiceExam;
 }
 
+async function getOwnedPracticeExamQuestion(
+  ctx: QueryCtx | MutationCtx,
+  practiceExamId: Id<"practiceExams">,
+  practiceExamQuestionId: Id<"practiceExamQuestions">,
+  userTokenIdentifier: string,
+) {
+  const practiceExam = await getOwnedPracticeExam(
+    ctx,
+    practiceExamId,
+    userTokenIdentifier,
+  );
+  const practiceExamQuestion = await ctx.db.get(practiceExamQuestionId);
+
+  if (
+    !practiceExamQuestion ||
+    practiceExamQuestion.practiceExam !== practiceExam._id
+  ) {
+    throw new ConvexError("Question not found in this practice exam");
+  }
+
+  return { practiceExam, practiceExamQuestion };
+}
+
+async function getOwnedPracticeExamQuestionById(
+  ctx: QueryCtx | MutationCtx,
+  practiceExamQuestionId: Id<"practiceExamQuestions">,
+  userTokenIdentifier: string,
+) {
+  const practiceExamQuestion = await ctx.db.get(practiceExamQuestionId);
+
+  if (!practiceExamQuestion) {
+    throw new ConvexError("Practice exam question not found");
+  }
+
+  const practiceExam = await getOwnedPracticeExam(
+    ctx,
+    practiceExamQuestion.practiceExam,
+    userTokenIdentifier,
+  );
+
+  return { practiceExam, practiceExamQuestion };
+}
+
 function getWeakestQuestionIds(
   questions: Doc<"questions">[],
   statsByQuestionId: Map<Id<"questions">, Doc<"userQuestionStats">>,
@@ -208,6 +251,7 @@ async function insertPracticeExam(
     userTokenIdentifier: string;
     questionIds: Id<"questions">[];
     allowRetries: boolean;
+    repeatIncorrectQuestionsLater: boolean;
     questionSelectionMode: StoredSelectionMode;
     retryOf?: Id<"practiceExams">;
   },
@@ -219,6 +263,7 @@ async function insertPracticeExam(
     status: "not_started",
     type: "multipleChoice",
     allowRetries: args.allowRetries,
+    repeatIncorrectQuestionsLater: args.repeatIncorrectQuestionsLater,
     questionCount: args.questionIds.length,
     answeredCount: 0,
     correctFirstTryCount: 0,
@@ -241,6 +286,40 @@ async function insertPracticeExam(
   }
 
   return practiceExamId;
+}
+
+async function insertRepeatedPracticeExamQuestion(
+  ctx: MutationCtx,
+  args: {
+    practiceExamId: Id<"practiceExams">;
+    questionId: Id<"questions">;
+    activeQuestionOrder: number;
+  },
+) {
+  const rows = await getPracticeExamQuestionRows(ctx, args.practiceExamId);
+  const minInsertOrder = args.activeQuestionOrder + 1;
+  const maxInsertOrder = rows.length;
+  const insertOrder =
+    Math.floor(Math.random() * (maxInsertOrder - minInsertOrder + 1)) +
+    minInsertOrder;
+
+  for (const row of rows) {
+    if (row.order >= insertOrder) {
+      await ctx.db.patch(row._id, {
+        order: row.order + 1,
+      });
+    }
+  }
+
+  await ctx.db.insert("practiceExamQuestions", {
+    practiceExam: args.practiceExamId,
+    question: args.questionId,
+    order: insertOrder,
+    isCorrect: false,
+    retryCount: 0,
+    attemptCount: 0,
+    isLocked: false,
+  });
 }
 
 export const dashboard = query({
@@ -320,6 +399,8 @@ export const dashboard = query({
               ? "continue"
               : "start",
         allowRetries: practiceExam.allowRetries,
+        repeatIncorrectQuestionsLater:
+          practiceExam.repeatIncorrectQuestionsLater ?? false,
         questionSelectionMode: practiceExam.questionSelectionMode,
       })),
       allExams: exams.map((exam) => ({
@@ -339,6 +420,7 @@ export const createPracticeExam = mutation({
     examId: v.id("exams"),
     type: v.union(v.literal("multipleChoice"), v.literal("openEnded")),
     allowRetries: v.boolean(),
+    repeatIncorrectQuestionsLater: v.boolean(),
     questionAmount: v.number(),
   },
   handler: async (ctx, args) => {
@@ -374,6 +456,7 @@ export const createPracticeExam = mutation({
       userTokenIdentifier: identity.tokenIdentifier,
       questionIds,
       allowRetries: args.allowRetries,
+      repeatIncorrectQuestionsLater: args.repeatIncorrectQuestionsLater,
       questionSelectionMode: "random",
     });
 
@@ -387,6 +470,7 @@ export const retryPracticeExam = mutation({
     otherQuestions: v.boolean(),
     questionAmount: v.number(),
     allowRetries: v.boolean(),
+    repeatIncorrectQuestionsLater: v.boolean(),
     questionSelectionMode: v.union(
       v.literal("globalUnanswered"),
       v.literal("sessionUnseen"),
@@ -436,6 +520,7 @@ export const retryPracticeExam = mutation({
       userTokenIdentifier: identity.tokenIdentifier,
       questionIds,
       allowRetries: args.allowRetries,
+      repeatIncorrectQuestionsLater: args.repeatIncorrectQuestionsLater,
       questionSelectionMode: args.otherQuestions
         ? args.questionSelectionMode
         : "sameQuestions",
@@ -503,12 +588,15 @@ export const getPracticeExam = query({
       examName: exam?.name ?? "Unknown exam",
       status: practiceExam.status,
       allowRetries: practiceExam.allowRetries,
+      repeatIncorrectQuestionsLater:
+        practiceExam.repeatIncorrectQuestionsLater ?? false,
       questionCount: practiceExam.questionCount,
       answeredCount: practiceExam.answeredCount,
       correctFirstTryCount: practiceExam.correctFirstTryCount,
       currentQuestion: currentRow && currentQuestion
         ? {
-            id: currentQuestion._id,
+            practiceExamQuestionId: currentRow._id,
+            questionId: currentQuestion._id,
             question: currentQuestion.question,
             options: currentQuestion.options,
             questionNumber: currentRow.order + 1,
@@ -528,28 +616,18 @@ export const getPracticeExam = query({
 export const submitAnswer = mutation({
   args: {
     practiceExamId: v.id("practiceExams"),
-    questionId: v.id("questions"),
+    practiceExamQuestionId: v.id("practiceExamQuestions"),
     selectedOptionIndex: v.number(),
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    const practiceExam = await getOwnedPracticeExam(
-      ctx,
-      args.practiceExamId,
-      identity.tokenIdentifier,
-    );
-    const practiceExamQuestion = await ctx.db
-      .query("practiceExamQuestions")
-      .withIndex("by_practiceExam_and_question", (queryBuilder) =>
-        queryBuilder
-          .eq("practiceExam", practiceExam._id)
-          .eq("question", args.questionId),
-      )
-      .unique();
-
-    if (!practiceExamQuestion) {
-      throw new ConvexError("Question not found in this practice exam");
-    }
+    const { practiceExam, practiceExamQuestion } =
+      await getOwnedPracticeExamQuestion(
+        ctx,
+        args.practiceExamId,
+        args.practiceExamQuestionId,
+        identity.tokenIdentifier,
+      );
 
     if (practiceExamQuestion.order !== practiceExam.activeQuestionOrder) {
       throw new ConvexError("Only the active question can be answered");
@@ -565,7 +643,7 @@ export const submitAnswer = mutation({
       };
     }
 
-    const question = await ctx.db.get(args.questionId);
+    const question = await ctx.db.get(practiceExamQuestion.question);
 
     if (!question) {
       throw new ConvexError("Question not found");
@@ -585,6 +663,8 @@ export const submitAnswer = mutation({
     const isCorrect = question.answer === args.selectedOptionIndex;
     const nextAttemptCount = practiceExamQuestion.attemptCount + 1;
     const shouldLock = isCorrect || !practiceExam.allowRetries;
+    const shouldInsertRepeatedQuestion =
+      !isCorrect && (practiceExam.repeatIncorrectQuestionsLater ?? false);
     const staticHelp = question.help?.[optionLetter(args.selectedOptionIndex)];
     const cachedFeedback =
       practiceExamQuestion.feedbackForOptionIndex === args.selectedOptionIndex
@@ -616,8 +696,20 @@ export const submitAnswer = mutation({
         (isCorrect && practiceExamQuestion.attemptCount === 0 ? 1 : 0);
     }
 
+    if (shouldInsertRepeatedQuestion) {
+      practiceExamPatch.questionCount = practiceExam.questionCount + 1;
+    }
+
     if (Object.keys(practiceExamPatch).length > 0) {
       await ctx.db.patch(practiceExam._id, practiceExamPatch);
+    }
+
+    if (shouldInsertRepeatedQuestion) {
+      await insertRepeatedPracticeExamQuestion(ctx, {
+        practiceExamId: practiceExam._id,
+        questionId: question._id,
+        activeQuestionOrder: practiceExam.activeQuestionOrder,
+      });
     }
 
     await ctx.db.patch(practiceExamQuestion._id, {
@@ -738,26 +830,17 @@ export const advanceToNextQuestion = mutation({
 
 export const getWrongAnswerFeedbackContext = internalQuery({
   args: {
-    practiceExamId: v.id("practiceExams"),
-    questionId: v.id("questions"),
+    practiceExamQuestionId: v.id("practiceExamQuestions"),
     selectedOptionIndex: v.number(),
     userTokenIdentifier: v.string(),
   },
   handler: async (ctx, args) => {
-    const practiceExam = await getOwnedPracticeExam(
+    const { practiceExamQuestion: row } = await getOwnedPracticeExamQuestionById(
       ctx,
-      args.practiceExamId,
+      args.practiceExamQuestionId,
       args.userTokenIdentifier,
     );
-    const row = await ctx.db
-      .query("practiceExamQuestions")
-      .withIndex("by_practiceExam_and_question", (queryBuilder) =>
-        queryBuilder
-          .eq("practiceExam", practiceExam._id)
-          .eq("question", args.questionId),
-      )
-      .unique();
-    const question = await ctx.db.get(args.questionId);
+    const question = await ctx.db.get(row.question);
 
     if (!row || !question) {
       throw new ConvexError("Feedback context not found");
@@ -797,26 +880,17 @@ export const getWrongAnswerFeedbackContext = internalQuery({
 
 export const storeGeneratedFeedback = internalMutation({
   args: {
-    practiceExamId: v.id("practiceExams"),
-    questionId: v.id("questions"),
+    practiceExamQuestionId: v.id("practiceExamQuestions"),
     selectedOptionIndex: v.number(),
     feedbackText: v.string(),
     userTokenIdentifier: v.string(),
   },
   handler: async (ctx, args) => {
-    const practiceExam = await getOwnedPracticeExam(
+    const { practiceExamQuestion: row } = await getOwnedPracticeExamQuestionById(
       ctx,
-      args.practiceExamId,
+      args.practiceExamQuestionId,
       args.userTokenIdentifier,
     );
-    const row = await ctx.db
-      .query("practiceExamQuestions")
-      .withIndex("by_practiceExam_and_question", (queryBuilder) =>
-        queryBuilder
-          .eq("practiceExam", practiceExam._id)
-          .eq("question", args.questionId),
-      )
-      .unique();
 
     if (!row) {
       throw new ConvexError("Practice exam question not found");

@@ -45,6 +45,7 @@ export function HomeDashboard() {
       otherQuestions: values.otherQuestions,
       questionAmount: values.questionAmount,
       allowRetries: values.allowRetries,
+      repeatIncorrectQuestionsLater: values.repeatIncorrectQuestionsLater,
       questionSelectionMode: values.questionSelectionMode,
     });
 

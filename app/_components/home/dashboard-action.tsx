@@ -40,6 +40,9 @@ export function DashboardAction({
           practiceExamId={practiceExam.id}
           defaultQuestionAmount={practiceExam.questionCount}
           defaultAllowRetries={practiceExam.allowRetries}
+          defaultRepeatIncorrectQuestionsLater={
+            practiceExam.repeatIncorrectQuestionsLater
+          }
           onSubmit={async (values) => {
             setOpen(false);
             await onRetry(values);

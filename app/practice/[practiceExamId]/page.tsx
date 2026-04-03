@@ -25,11 +25,13 @@ type PracticeExamState = {
   examName: string;
   status: "not_started" | "in_progress" | "completed";
   allowRetries: boolean;
+  repeatIncorrectQuestionsLater: boolean;
   questionCount: number;
   answeredCount: number;
   correctFirstTryCount: number;
   currentQuestion: {
-    id: Id<"questions">;
+    practiceExamQuestionId: Id<"practiceExamQuestions">;
+    questionId: Id<"questions">;
     question: string;
     options: string[];
     questionNumber: number;
@@ -191,16 +193,16 @@ function PracticeExamPlayer() {
 
   const currentQuestion = data?.currentQuestion ?? null;
   const selectedOptionIndex = currentQuestion
-    ? (selectedAnswers[currentQuestion.id] ??
+    ? (selectedAnswers[currentQuestion.practiceExamQuestionId] ??
       currentQuestion.selectedOptionIndex ??
       null)
     : null;
   const feedbackOverride = currentQuestion
-    ? (feedbackOverrides[currentQuestion.id] ?? null)
+    ? (feedbackOverrides[currentQuestion.practiceExamQuestionId] ?? null)
     : null;
   const secondsRemaining =
     currentQuestion && currentQuestion.isCorrect
-      ? countdownState?.questionId === currentQuestion.id
+      ? countdownState?.questionId === currentQuestion.practiceExamQuestionId
         ? countdownState.seconds
         : 5
       : null;
@@ -223,9 +225,12 @@ function PracticeExamPlayer() {
           return null;
         }
 
-        if (!current || current.questionId !== currentQuestion.id) {
+        if (
+          !current ||
+          current.questionId !== currentQuestion.practiceExamQuestionId
+        ) {
           return {
-            questionId: currentQuestion.id,
+            questionId: currentQuestion.practiceExamQuestionId,
             seconds: 4,
           };
         }
@@ -286,6 +291,7 @@ function PracticeExamPlayer() {
       otherQuestions: values.otherQuestions,
       questionAmount: values.questionAmount,
       allowRetries: values.allowRetries,
+      repeatIncorrectQuestionsLater: values.repeatIncorrectQuestionsLater,
       questionSelectionMode: values.questionSelectionMode,
     });
 
@@ -293,28 +299,32 @@ function PracticeExamPlayer() {
   };
 
   const handleAnswerSelect = (
-    questionId: Id<"questions">,
+    practiceExamQuestionId: Id<"practiceExamQuestions">,
     optionIndex: number,
   ) => {
-    if (!currentQuestion || currentQuestion.id !== questionId || isSubmitting) {
+    if (
+      !currentQuestion ||
+      currentQuestion.practiceExamQuestionId !== practiceExamQuestionId ||
+      isSubmitting
+    ) {
       return;
     }
 
     setSelectedAnswers((current) => ({
       ...current,
-      [questionId]: optionIndex,
+      [practiceExamQuestionId]: optionIndex,
     }));
 
     startSubmitTransition(async () => {
       const result = await submitAnswer({
         practiceExamId,
-        questionId,
+        practiceExamQuestionId,
         selectedOptionIndex: optionIndex,
       });
 
       if (result.outcome === "incorrect") {
         setJitterState((current) => ({
-          questionId,
+          questionId: practiceExamQuestionId,
           optionIndex,
           nonce: (current?.nonce ?? 0) + 1,
         }));
@@ -322,14 +332,13 @@ function PracticeExamPlayer() {
 
       if (result.outcome === "incorrect" && result.needsAiFeedback) {
         const feedback = await generateWrongAnswerFeedback({
-          practiceExamId,
-          questionId,
+          practiceExamQuestionId,
           selectedOptionIndex: optionIndex,
         });
 
         setFeedbackOverrides((current) => ({
           ...current,
-          [questionId]: {
+          [practiceExamQuestionId]: {
             text: feedback.feedbackText,
             source: feedback.feedbackSource,
           },
@@ -337,14 +346,14 @@ function PracticeExamPlayer() {
       } else if (result.outcome === "correct") {
         setFeedbackOverrides((current) => {
           const next = { ...current };
-          delete next[questionId];
+          delete next[practiceExamQuestionId];
           return next;
         });
       } else if (result.feedbackText) {
         const feedbackText = result.feedbackText;
         setFeedbackOverrides((current) => ({
           ...current,
-          [questionId]: {
+          [practiceExamQuestionId]: {
             text: feedbackText,
             source: result.feedbackSource ?? "feedback",
           },
@@ -390,6 +399,9 @@ function PracticeExamPlayer() {
               practiceExamId={data.id}
               defaultQuestionAmount={data.questionCount}
               defaultAllowRetries={data.allowRetries}
+              defaultRepeatIncorrectQuestionsLater={
+                data.repeatIncorrectQuestionsLater
+              }
               onSubmit={handleRetry}
             />
           </section>
@@ -433,15 +445,20 @@ function PracticeExamPlayer() {
               isSubmitting;
             const isCorrectSelection = currentQuestion.isCorrect && isSelected;
             const isJittering =
-              jitterState?.questionId === currentQuestion.id &&
+              jitterState?.questionId === currentQuestion.practiceExamQuestionId &&
               jitterState.optionIndex === index;
 
             return (
               <button
-                key={`${currentQuestion.id}-${index}-${isJittering ? jitterState.nonce : 0}`}
+                key={`${currentQuestion.practiceExamQuestionId}-${index}-${isJittering ? jitterState.nonce : 0}`}
                 type="button"
                 disabled={isDisabled}
-                onClick={() => handleAnswerSelect(currentQuestion.id, index)}
+                onClick={() =>
+                  handleAnswerSelect(
+                    currentQuestion.practiceExamQuestionId,
+                    index,
+                  )
+                }
                 className={[
                   "flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors",
                   isCorrectSelection
