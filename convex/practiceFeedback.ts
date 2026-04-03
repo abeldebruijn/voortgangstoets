@@ -87,8 +87,7 @@ function extractContent(payload: {
 
 export const generateWrongAnswerFeedback = action({
   args: {
-    practiceExamId: v.id("practiceExams"),
-    questionId: v.id("questions"),
+    practiceExamQuestionId: v.id("practiceExamQuestions"),
     selectedOptionIndex: v.number(),
   },
   handler: async (ctx, args): Promise<FeedbackResult> => {

@@ -46,6 +46,7 @@ export default defineSchema({
     ),
     type: v.literal("multipleChoice"),
     allowRetries: v.boolean(),
+    repeatIncorrectQuestionsLater: v.optional(v.boolean()),
     questionCount: v.number(),
     answeredCount: v.number(),
     correctFirstTryCount: v.number(),

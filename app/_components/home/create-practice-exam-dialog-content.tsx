@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { AllowRetriesTooltip } from "@/components/allow-retries-tooltip";
+import { RepeatIncorrectQuestionsTooltip } from "@/components/repeat-incorrect-questions-tooltip";
 
 import type { ExamRow } from "@/app/util/home";
 
@@ -21,9 +22,15 @@ export function CreatePracticeExamDialogContent({
 }: {
   exam: ExamRow;
   isPending: boolean;
-  onSubmit: (values: { allowRetries: boolean; questionAmount: number }) => void;
+  onSubmit: (values: {
+    allowRetries: boolean;
+    repeatIncorrectQuestionsLater: boolean;
+    questionAmount: number;
+  }) => void;
 }) {
   const [allowRetries, setAllowRetries] = useState(false);
+  const [repeatIncorrectQuestionsLater, setRepeatIncorrectQuestionsLater] =
+    useState(false);
   const [questionAmount, setQuestionAmount] = useState(20);
 
   return (
@@ -58,6 +65,20 @@ export function CreatePracticeExamDialogContent({
         </span>
       </label>
 
+      <label className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
+        <input
+          type="checkbox"
+          checked={repeatIncorrectQuestionsLater}
+          onChange={(event) =>
+            setRepeatIncorrectQuestionsLater(event.target.checked)
+          }
+        />
+        <span className="flex w-full items-center justify-between gap-2">
+          <span>Foute vragen later herhalen</span>
+          <RepeatIncorrectQuestionsTooltip />
+        </span>
+      </label>
+
       <div className="flex flex-col gap-1">
         <label htmlFor="create-question-amount" className="text-sm font-medium">
           Aantal vragen
@@ -81,6 +102,7 @@ export function CreatePracticeExamDialogContent({
           onClick={() => {
             onSubmit({
               allowRetries,
+              repeatIncorrectQuestionsLater,
               questionAmount,
             });
           }}

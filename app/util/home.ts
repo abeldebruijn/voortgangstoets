@@ -18,15 +18,18 @@ export type DashboardState = {
 export function buildCreatePracticeExamHref({
   examId,
   allowRetries,
+  repeatIncorrectQuestionsLater,
   questionAmount,
 }: {
   examId: Id<"exams">;
   allowRetries: boolean;
+  repeatIncorrectQuestionsLater: boolean;
   questionAmount: number;
 }) {
   const params = new URLSearchParams({
     examId,
     allowRetries: String(allowRetries),
+    repeatIncorrectQuestionsLater: String(repeatIncorrectQuestionsLater),
     questionAmount: String(questionAmount),
   });
 

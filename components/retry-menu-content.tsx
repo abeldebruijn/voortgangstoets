@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Info } from "lucide-react";
 
 import { AllowRetriesTooltip } from "@/components/allow-retries-tooltip";
+import { RepeatIncorrectQuestionsTooltip } from "@/components/repeat-incorrect-questions-tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,6 +23,7 @@ export type RetryMenuValues = {
   otherQuestions: boolean;
   questionAmount: number;
   allowRetries: boolean;
+  repeatIncorrectQuestionsLater: boolean;
   questionSelectionMode: RetrySelectionMode;
 };
 
@@ -38,6 +40,7 @@ export function RetryMenuContent({
   practiceExamId,
   defaultQuestionAmount,
   defaultAllowRetries,
+  defaultRepeatIncorrectQuestionsLater,
   onSubmit,
   submitLabel = "Opnieuw starten",
   className,
@@ -45,6 +48,7 @@ export function RetryMenuContent({
   practiceExamId: string;
   defaultQuestionAmount: number;
   defaultAllowRetries: boolean;
+  defaultRepeatIncorrectQuestionsLater: boolean;
   onSubmit: (values: RetryMenuValues) => Promise<void>;
   submitLabel?: string;
   className?: string;
@@ -52,6 +56,8 @@ export function RetryMenuContent({
   const [otherQuestions, setOtherQuestions] = useState(true);
   const [questionAmount, setQuestionAmount] = useState(defaultQuestionAmount);
   const [allowRetries, setAllowRetries] = useState(defaultAllowRetries);
+  const [repeatIncorrectQuestionsLater, setRepeatIncorrectQuestionsLater] =
+    useState(defaultRepeatIncorrectQuestionsLater);
   const [questionSelectionMode, setQuestionSelectionMode] =
     useState<RetrySelectionMode>("globalUnanswered");
   const [isPending, startTransition] = useTransition();
@@ -95,6 +101,20 @@ export function RetryMenuContent({
         <span className="flex w-full items-center justify-between gap-2">
           <span>Herkansingen toestaan</span>
           <AllowRetriesTooltip />
+        </span>
+      </label>
+
+      <label className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
+        <input
+          type="checkbox"
+          checked={repeatIncorrectQuestionsLater}
+          onChange={(event) =>
+            setRepeatIncorrectQuestionsLater(event.target.checked)
+          }
+        />
+        <span className="flex w-full items-center justify-between gap-2">
+          <span>Foute vragen later herhalen</span>
+          <RepeatIncorrectQuestionsTooltip />
         </span>
       </label>
 
@@ -155,6 +175,7 @@ export function RetryMenuContent({
               otherQuestions,
               questionAmount,
               allowRetries,
+              repeatIncorrectQuestionsLater,
               questionSelectionMode,
             });
           });

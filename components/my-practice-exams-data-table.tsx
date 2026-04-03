@@ -38,6 +38,7 @@ export type MyPracticeExam = {
   type: "multipleChoice";
   actionKind: "start" | "continue" | "retry";
   allowRetries: boolean;
+  repeatIncorrectQuestionsLater: boolean;
   questionSelectionMode: string;
 };
 

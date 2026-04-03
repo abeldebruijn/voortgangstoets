@@ -15,9 +15,11 @@ export function CreatePracticeExamAction({ exam }: { exam: ExamRow }) {
 
   const handleCreatePracticeExam = ({
     allowRetries,
+    repeatIncorrectQuestionsLater,
     questionAmount,
   }: {
     allowRetries: boolean;
+    repeatIncorrectQuestionsLater: boolean;
     questionAmount: number;
   }) => {
     setIsRedirecting(true);
@@ -26,6 +28,7 @@ export function CreatePracticeExamAction({ exam }: { exam: ExamRow }) {
       buildCreatePracticeExamHref({
         examId: exam.id,
         allowRetries,
+        repeatIncorrectQuestionsLater,
         questionAmount,
       }),
     );

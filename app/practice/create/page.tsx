@@ -13,6 +13,9 @@ function parseCreatePracticeExamSearchParams(searchParams: URLSearchParams) {
   const examId = searchParams.get("examId");
   const questionAmount = Number(searchParams.get("questionAmount"));
   const allowRetries = searchParams.get("allowRetries");
+  const repeatIncorrectQuestionsLater = searchParams.get(
+    "repeatIncorrectQuestionsLater",
+  );
 
   if (!examId || !Number.isFinite(questionAmount) || questionAmount < 1) {
     return null;
@@ -22,6 +25,7 @@ function parseCreatePracticeExamSearchParams(searchParams: URLSearchParams) {
     examId: examId as Id<"exams">,
     questionAmount,
     allowRetries: allowRetries === "true",
+    repeatIncorrectQuestionsLater: repeatIncorrectQuestionsLater === "true",
   };
 }
 
@@ -68,6 +72,7 @@ function CreatePracticeExamLoader() {
       examId: request.examId,
       type: "multipleChoice",
       allowRetries: request.allowRetries,
+      repeatIncorrectQuestionsLater: request.repeatIncorrectQuestionsLater,
       questionAmount: request.questionAmount,
     })
       .then((result) => {
