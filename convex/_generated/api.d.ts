@@ -9,6 +9,8 @@
  */
 
 import type * as myFunctions from "../myFunctions.js";
+import type * as practiceExams from "../practiceExams.js";
+import type * as practiceFeedback from "../practiceFeedback.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +20,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   myFunctions: typeof myFunctions;
+  practiceExams: typeof practiceExams;
+  practiceFeedback: typeof practiceFeedback;
 }>;
 
 /**
