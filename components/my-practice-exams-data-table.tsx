@@ -82,7 +82,7 @@ function DataTableFilter({
           "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
         )}
       >
-        <option value="">All</option>
+        <option value="">Alle</option>
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
@@ -127,14 +127,14 @@ export function MyPracticeExamsDataTable({
   const columns: ColumnDef<MyPracticeExamRow>[] = [
     {
       accessorKey: "examLabel",
-      header: "Exam",
+      header: "Examen",
       cell: ({ row }) => (
         <span className="font-medium">{row.original.examLabel}</span>
       ),
     },
     {
       accessorKey: "progressLabel",
-      header: "Progress",
+      header: "Voortgang",
     },
     {
       accessorKey: "scorePercentage",
@@ -170,7 +170,7 @@ export function MyPracticeExamsDataTable({
     },
     {
       id: "action",
-      header: () => <div className="text-right">Action</div>,
+      header: () => <div className="text-right">Actie</div>,
       enableSorting: false,
       cell: ({ row }) => (
         <div className="text-right">{renderAction(row.original)}</div>
@@ -211,11 +211,11 @@ export function MyPracticeExamsDataTable({
     <section className="flex flex-col gap-3 rounded-2xl border bg-background p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
-          <h3 className="text-base font-semibold">My practice exams</h3>
+          <h3 className="text-base font-semibold">Mijn oefentoetsen</h3>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <DataTableFilter
-            label="Progress"
+            label="Voortgang"
             value={progressFilter}
             options={progressOptions}
             onChange={(value) => {
@@ -259,7 +259,7 @@ export function MyPracticeExamsDataTable({
                 colSpan={columns.length}
                 className="py-8 text-center text-muted-foreground"
               >
-                No practice exams match the current filters.
+                Geen oefentoetsen gevonden met de huidige filters.
               </TableCell>
             </TableRow>
           ) : (
@@ -278,7 +278,7 @@ export function MyPracticeExamsDataTable({
 
       <div className="flex flex-col gap-3 border-t pt-3 text-sm sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground">
-          Page {table.getState().pagination.pageIndex + 1} of{" "}
+          Pagina {table.getState().pagination.pageIndex + 1} van{" "}
           {Math.max(table.getPageCount(), 1)}
         </p>
         <div className="flex items-center justify-end gap-2">
@@ -287,14 +287,14 @@ export function MyPracticeExamsDataTable({
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
           >
-            Previous
+            Vorige
           </Button>
           <Button
             variant="outline"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
           >
-            Next
+            Volgende
           </Button>
         </div>
       </div>

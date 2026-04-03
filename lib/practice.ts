@@ -7,28 +7,28 @@ export const RETRY_SELECTION_MODES = [
 export type RetrySelectionMode = (typeof RETRY_SELECTION_MODES)[number];
 
 export function formatPracticeType(type: string) {
-  return type === "multipleChoice" ? "Multiple choice" : "Open ended";
+  return type === "multipleChoice" ? "Meerkeuze" : "Open vragen";
 }
 
 export function formatProgress(progress: string) {
   switch (progress) {
     case "completed":
-      return "Completed";
+      return "Afgerond";
     case "in_progress":
-      return "In progress";
+      return "Bezig";
     default:
-      return "Not started";
+      return "Niet gestart";
   }
 }
 
 export function selectionModeLabel(mode: RetrySelectionMode) {
   switch (mode) {
     case "globalUnanswered":
-      return "Globally unanswered";
+      return "Globaal onbeantwoord";
     case "sessionUnseen":
-      return "Previous-session unseen";
+      return "Vorige sessie niet gezien";
     case "weakest":
-      return "Weakest questions";
+      return "Zwakste vragen";
   }
 }
 

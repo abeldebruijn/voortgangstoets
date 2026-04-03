@@ -30,7 +30,7 @@ export function HomeDashboard() {
 
   if (!data) {
     return (
-      <p className="text-sm text-muted-foreground">Loading dashboard...</p>
+      <p className="text-sm text-muted-foreground">Dashboard laden...</p>
     );
   }
 
@@ -54,10 +54,10 @@ export function HomeDashboard() {
   return (
     <>
       <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-semibold">Your dashboard</h2>
+        <h2 className="text-2xl font-semibold">Jouw dashboard</h2>
         <p className="text-sm text-muted-foreground">
-          Start a new session, continue one in progress, or retry with a
-          different question strategy.
+          Start een nieuwe sessie, ga verder met een lopende sessie, of probeer
+          het opnieuw met een andere vraagstrategie.
         </p>
       </div>
 
@@ -76,13 +76,13 @@ export function HomeDashboard() {
 
       <section className="flex flex-col gap-3 rounded-2xl border bg-background p-4 sm:p-5">
         <div className="flex flex-col gap-1">
-          <h3 className="text-base font-semibold">All exams</h3>
+          <h3 className="text-base font-semibold">Alle examens</h3>
         </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Number of questions</TableHead>
+              <TableHead>Naam</TableHead>
+              <TableHead>Aantal vragen</TableHead>
               <TableHead className="text-right" />
             </TableRow>
           </TableHeader>
@@ -93,7 +93,7 @@ export function HomeDashboard() {
                   colSpan={3}
                   className="py-8 text-center text-muted-foreground"
                 >
-                  No exams found.
+                  Geen examens gevonden.
                 </TableCell>
               </TableRow>
             ) : (

@@ -26,11 +26,11 @@ export type RetryMenuValues = {
 
 const selectionModeDescription: Record<RetrySelectionMode, string> = {
   globalUnanswered:
-    "Picks questions you have never answered before across all practice exams for this exam, then fills any remaining spots with other available questions.",
+    "Kiest vragen die je nog nooit hebt beantwoord in alle oefentoetsen voor dit examen, en vult de rest aan met andere beschikbare vragen.",
   sessionUnseen:
-    "Prefers questions that were not included in the previous practice exam session, then fills any remaining spots with other available questions.",
+    "Geeft voorkeur aan vragen die niet in de vorige oefentoets zaten, en vult de rest aan met andere beschikbare vragen.",
   weakest:
-    "Prioritizes questions you struggle with most based on your past answers, then fills any remaining spots with other available questions.",
+    "Geeft prioriteit aan vragen waar je het meest moeite mee hebt op basis van je eerdere antwoorden, en vult de rest aan met andere beschikbare vragen.",
 };
 
 export function RetryMenuContent({
@@ -38,7 +38,7 @@ export function RetryMenuContent({
   defaultQuestionAmount,
   defaultAllowRetries,
   onSubmit,
-  submitLabel = "Start retry",
+  submitLabel = "Opnieuw starten",
   className,
 }: {
   practiceExamId: string;
@@ -58,9 +58,9 @@ export function RetryMenuContent({
   return (
     <div className={["flex flex-col gap-3", className ?? ""].join(" ").trim()}>
       <div className="flex flex-col gap-1">
-        <h3 className="text-base font-semibold">Retry practice exam</h3>
+        <h3 className="text-base font-semibold">Oefentoets opnieuw proberen</h3>
         <p className="text-sm text-muted-foreground">
-          Choose the next question set before starting a new retry.
+          Kies de volgende vraagset voordat je opnieuw begint.
         </p>
       </div>
 
@@ -69,7 +69,7 @@ export function RetryMenuContent({
           htmlFor={`question-amount-${practiceExamId}`}
           className="text-sm font-medium"
         >
-          Question amount
+          Aantal vragen
         </label>
         <Input
           id={`question-amount-${practiceExamId}`}
@@ -91,7 +91,7 @@ export function RetryMenuContent({
           checked={allowRetries}
           onChange={(event) => setAllowRetries(event.target.checked)}
         />
-        <span>Allow retries</span>
+        <span>Herkansingen toestaan</span>
       </label>
 
       <label className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
@@ -100,12 +100,12 @@ export function RetryMenuContent({
           checked={otherQuestions}
           onChange={(event) => setOtherQuestions(event.target.checked)}
         />
-        <span>Other questions</span>
+        <span>Andere vragen</span>
       </label>
 
       {otherQuestions ? (
         <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium">Question selection</legend>
+          <legend className="text-sm font-medium">Vraagselectie</legend>
           <TooltipProvider>
             {RETRY_SELECTION_MODES.map((mode) => (
               <div
@@ -157,7 +157,7 @@ export function RetryMenuContent({
         }}
         disabled={isPending}
       >
-        {isPending ? "Creating retry..." : submitLabel}
+        {isPending ? "Aanmaken..." : submitLabel}
       </Button>
     </div>
   );

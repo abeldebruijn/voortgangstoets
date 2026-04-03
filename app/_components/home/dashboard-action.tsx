@@ -27,14 +27,14 @@ export function DashboardAction({
         variant={practiceExam.actionKind === "start" ? "default" : "outline"}
         onClick={onContinue}
       >
-        {practiceExam.actionKind === "start" ? "Start" : "Continue"}
+        {practiceExam.actionKind === "start" ? "Start" : "Doorgaan"}
       </Button>
     );
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" />}>Retry</DialogTrigger>
+      <DialogTrigger render={<Button variant="outline" />}>Opnieuw</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <RetryMenuContent
           practiceExamId={practiceExam.id}

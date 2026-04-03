@@ -28,20 +28,20 @@ export function CreatePracticeExamDialogContent({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Create practice exam</DialogTitle>
-        <DialogDescription>{`Based on ${exam.name}.`}</DialogDescription>
+        <DialogTitle>Oefentoets aanmaken</DialogTitle>
+        <DialogDescription>{`Gebaseerd op ${exam.name}.`}</DialogDescription>
       </DialogHeader>
 
       <fieldset className="flex flex-col gap-2">
         <legend className="text-sm font-medium">Type</legend>
         <div className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
           <span className="size-4 rounded-full border-4 border-primary" />
-          <span>Multiple choice</span>
+          <span>Meerkeuze</span>
         </div>
         <div className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm text-muted-foreground">
           <span className="size-4 rounded-full border border-muted-foreground/40" />
-          <span>Open ended</span>
-          <span className="text-xs">Available in the future</span>
+          <span>Open vragen</span>
+          <span className="text-xs">Binnenkort beschikbaar</span>
         </div>
       </fieldset>
 
@@ -51,12 +51,12 @@ export function CreatePracticeExamDialogContent({
           checked={allowRetries}
           onChange={(event) => setAllowRetries(event.target.checked)}
         />
-        <span>Allow retries</span>
+        <span>Herkansingen toestaan</span>
       </label>
 
       <div className="flex flex-col gap-1">
         <label htmlFor="create-question-amount" className="text-sm font-medium">
-          Question amount
+          Aantal vragen
         </label>
         <Input
           id="create-question-amount"
@@ -82,7 +82,7 @@ export function CreatePracticeExamDialogContent({
           }}
           disabled={isPending}
         >
-          {isPending ? "Creating..." : "Create practice exam"}
+          {isPending ? "Aanmaken..." : "Oefentoets aanmaken"}
         </Button>
       </DialogFooter>
     </>

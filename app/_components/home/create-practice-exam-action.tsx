@@ -42,8 +42,8 @@ export function CreatePracticeExamAction({ exam }: { exam: ExamRow }) {
         }
       >
         {exam.answerableQuestionCount === 0
-          ? "No practice exam available"
-          : "Create practice exam"}
+          ? "Geen oefentoets beschikbaar"
+          : "Oefentoets aanmaken"}
       </DialogTrigger>
       <DialogContent>
         <CreatePracticeExamDialogContent
