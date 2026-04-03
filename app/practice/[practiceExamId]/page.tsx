@@ -365,7 +365,7 @@ function PracticeExamPlayer() {
               Score {data.correctFirstTryCount} / {data.questionCount}
             </p>
           </div>
-          <h2 className="text-lg font-semibold leading-relaxed">
+          <h2 className="sm:text-lg text-sm font-semibold leading-relaxed">
             {currentQuestion.question}
           </h2>
         </div>
