@@ -10,6 +10,10 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import {
+  MyPracticeExamsDataTable,
+  type MyPracticeExam,
+} from "@/components/my-practice-exams-data-table";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,14 +22,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import Nav from "@/components/ui/nav";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   RetryMenuContent,
   type RetryMenuValues,
@@ -40,21 +40,6 @@ import {
 } from "@/components/ui/table";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { formatPracticeType, formatProgress } from "@/lib/practice";
-
-type MyPracticeExam = {
-  id: Id<"practiceExams">;
-  examName: string;
-  examYear: number | null;
-  examMonth: number | null;
-  progress: "not_started" | "in_progress" | "completed";
-  scoreCorrect: number;
-  questionCount: number;
-  type: "multipleChoice";
-  actionKind: "start" | "continue" | "retry";
-  allowRetries: boolean;
-  questionSelectionMode: string;
-};
 type ExamRow = {
   id: Id<"exams">;
   name: string;
@@ -68,7 +53,11 @@ type DashboardState = {
   allExams: ExamRow[];
 };
 
-function formatExamLabel(name: string, year: number | null, month: number | null) {
+function formatExamLabel(
+  name: string,
+  year: number | null,
+  month: number | null,
+) {
   if (year === null || month === null) {
     return name;
   }
@@ -167,66 +156,26 @@ function Dashboard() {
       </div>
 
       {hasMyPracticeExams ? (
-        <section className="flex flex-col gap-3 rounded-2xl border bg-background p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-1">
-              <h3 className="text-base font-semibold">My practice exams</h3>
-              <p className="text-sm text-muted-foreground">
-                All practice exams you created.
-              </p>
-            </div>
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Exam</TableHead>
-                <TableHead>Progress</TableHead>
-                <TableHead>Score</TableHead>
-                <TableHead>Questions</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.myPracticeExams.map((practiceExam) => (
-                <TableRow key={practiceExam.id}>
-                  <TableCell className="font-medium">
-                    {formatExamLabel(
-                      practiceExam.examName,
-                      practiceExam.examYear,
-                      practiceExam.examMonth,
-                    )}
-                  </TableCell>
-                  <TableCell>{formatProgress(practiceExam.progress)}</TableCell>
-                  <TableCell>
-                    {practiceExam.scoreCorrect} / {practiceExam.questionCount}
-                  </TableCell>
-                  <TableCell>{practiceExam.questionCount}</TableCell>
-                  <TableCell>{formatPracticeType(practiceExam.type)}</TableCell>
-                  <TableCell className="text-right">
-                    <DashboardAction
-                      practiceExam={practiceExam}
-                      onContinue={() =>
-                        router.push(`/practice/${practiceExam.id}`)
-                      }
-                      onRetry={async (values) => {
-                        const result = await retryPracticeExam({
-                          practiceExamId: practiceExam.id,
-                          otherQuestions: values.otherQuestions,
-                          questionAmount: values.questionAmount,
-                          allowRetries: values.allowRetries,
-                          questionSelectionMode: values.questionSelectionMode,
-                        });
+        <MyPracticeExamsDataTable
+          practiceExams={data.myPracticeExams}
+          renderAction={(practiceExam) => (
+            <DashboardAction
+              practiceExam={practiceExam}
+              onContinue={() => router.push(`/practice/${practiceExam.id}`)}
+              onRetry={async (values) => {
+                const result = await retryPracticeExam({
+                  practiceExamId: practiceExam.id,
+                  otherQuestions: values.otherQuestions,
+                  questionAmount: values.questionAmount,
+                  allowRetries: values.allowRetries,
+                  questionSelectionMode: values.questionSelectionMode,
+                });
 
-                        router.push(`/practice/${result.practiceExamId}`);
-                      }}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </section>
+                router.push(`/practice/${result.practiceExamId}`);
+              }}
+            />
+          )}
+        />
       ) : null}
 
       <section className="flex flex-col gap-3 rounded-2xl border bg-background p-4 sm:p-5">
@@ -388,18 +337,19 @@ function DashboardAction({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button variant="outline" />}>
-        Retry
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="outline" />}>Retry</DialogTrigger>
+      <DialogContent className="sm:max-w-md">
         <RetryMenuContent
           practiceExamId={practiceExam.id}
           defaultQuestionAmount={practiceExam.questionCount}
           defaultAllowRetries={practiceExam.allowRetries}
-          onSubmit={onRetry}
+          onSubmit={async (values) => {
+            setOpen(false);
+            await onRetry(values);
+          }}
         />
-      </PopoverContent>
-    </Popover>
+      </DialogContent>
+    </Dialog>
   );
 }
