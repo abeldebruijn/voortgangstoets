@@ -147,8 +147,46 @@
   }
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @layer components {
   .answer-jitter {
     animation: answer-jitter 320ms ease-in-out 2;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.7s ease-out both;
+  }
+
+  .animate-fade-in-delayed {
+    animation: fade-in 0.7s ease-out 0.2s both;
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.8s ease-out 0.4s both;
+  }
+
+  .animate-fade-in-up-delayed {
+    animation: fade-in-up 0.8s ease-out 0.7s both;
   }
 }
