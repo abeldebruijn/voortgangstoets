@@ -69,8 +69,6 @@ function ScoreDial({ correct, total }: { correct: number; total: number }) {
     const durationMs = 900;
     const startedAt = performance.now();
 
-    setDisplayPercentage(0);
-
     const tick = (now: number) => {
       const elapsed = now - startedAt;
       const progress = Math.min(elapsed / durationMs, 1);
@@ -265,11 +263,6 @@ function PracticeExamPlayer() {
     feedbackOverride?.text ?? currentQuestion?.feedbackText ?? null;
   const feedbackSource =
     feedbackOverride?.source ?? currentQuestion?.feedbackSource ?? null;
-  const submitDisabled =
-    !currentQuestion ||
-    selectedOptionIndex === null ||
-    currentQuestion.isLocked ||
-    isSubmitting;
 
   const answerTone = useMemo(() => {
     if (!currentQuestion) {
@@ -297,6 +290,67 @@ function PracticeExamPlayer() {
     });
 
     router.push(`/practice/${result.practiceExamId}`);
+  };
+
+  const handleAnswerSelect = (
+    questionId: Id<"questions">,
+    optionIndex: number,
+  ) => {
+    if (!currentQuestion || currentQuestion.id !== questionId || isSubmitting) {
+      return;
+    }
+
+    setSelectedAnswers((current) => ({
+      ...current,
+      [questionId]: optionIndex,
+    }));
+
+    startSubmitTransition(async () => {
+      const result = await submitAnswer({
+        practiceExamId,
+        questionId,
+        selectedOptionIndex: optionIndex,
+      });
+
+      if (result.outcome === "incorrect") {
+        setJitterState((current) => ({
+          questionId,
+          optionIndex,
+          nonce: (current?.nonce ?? 0) + 1,
+        }));
+      }
+
+      if (result.outcome === "incorrect" && result.needsAiFeedback) {
+        const feedback = await generateWrongAnswerFeedback({
+          practiceExamId,
+          questionId,
+          selectedOptionIndex: optionIndex,
+        });
+
+        setFeedbackOverrides((current) => ({
+          ...current,
+          [questionId]: {
+            text: feedback.feedbackText,
+            source: feedback.feedbackSource,
+          },
+        }));
+      } else if (result.outcome === "correct") {
+        setFeedbackOverrides((current) => {
+          const next = { ...current };
+          delete next[questionId];
+          return next;
+        });
+      } else if (result.feedbackText) {
+        const feedbackText = result.feedbackText;
+        setFeedbackOverrides((current) => ({
+          ...current,
+          [questionId]: {
+            text: feedbackText,
+            source: result.feedbackSource ?? "feedback",
+          },
+        }));
+      }
+    });
   };
 
   if (!data) {
@@ -374,7 +428,9 @@ function PracticeExamPlayer() {
           {currentQuestion.options.map((option, index) => {
             const isSelected = selectedOptionIndex === index;
             const isDisabled =
-              currentQuestion.isLocked || currentQuestion.isCorrect;
+              currentQuestion.isLocked ||
+              currentQuestion.isCorrect ||
+              isSubmitting;
             const isCorrectSelection = currentQuestion.isCorrect && isSelected;
             const isJittering =
               jitterState?.questionId === currentQuestion.id &&
@@ -385,12 +441,7 @@ function PracticeExamPlayer() {
                 key={`${currentQuestion.id}-${index}-${isJittering ? jitterState.nonce : 0}`}
                 type="button"
                 disabled={isDisabled}
-                onClick={() =>
-                  setSelectedAnswers((current) => ({
-                    ...current,
-                    [currentQuestion.id]: index,
-                  }))
-                }
+                onClick={() => handleAnswerSelect(currentQuestion.id, index)}
                 className={[
                   "flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors",
                   isCorrectSelection
@@ -414,69 +465,6 @@ function PracticeExamPlayer() {
         </div>
 
         <div className="flex flex-col gap-3">
-          {!currentQuestion.isLocked && !currentQuestion.isCorrect ? (
-            <Button
-              disabled={submitDisabled}
-              onClick={() => {
-                if (selectedOptionIndex === null) {
-                  return;
-                }
-
-                startSubmitTransition(async () => {
-                  const result = await submitAnswer({
-                    practiceExamId,
-                    questionId: currentQuestion.id,
-                    selectedOptionIndex,
-                  });
-
-                  if (result.outcome === "incorrect") {
-                    setJitterState((current) => ({
-                      questionId: currentQuestion.id,
-                      optionIndex: selectedOptionIndex,
-                      nonce: (current?.nonce ?? 0) + 1,
-                    }));
-                  }
-
-                  if (
-                    result.outcome === "incorrect" &&
-                    result.needsAiFeedback
-                  ) {
-                    const feedback = await generateWrongAnswerFeedback({
-                      practiceExamId,
-                      questionId: currentQuestion.id,
-                      selectedOptionIndex,
-                    });
-
-                    setFeedbackOverrides((current) => ({
-                      ...current,
-                      [currentQuestion.id]: {
-                        text: feedback.feedbackText,
-                        source: feedback.feedbackSource,
-                      },
-                    }));
-                  } else if (result.outcome === "correct") {
-                    setFeedbackOverrides((current) => {
-                      const next = { ...current };
-                      delete next[currentQuestion.id];
-                      return next;
-                    });
-                  } else if (result.feedbackText) {
-                    const feedbackText = result.feedbackText;
-                    setFeedbackOverrides((current) => ({
-                      ...current,
-                      [currentQuestion.id]: {
-                        text: feedbackText,
-                        source: result.feedbackSource ?? "feedback",
-                      },
-                    }));
-                  }
-                });
-              }}
-            >
-              {isSubmitting ? "Checking..." : "Submit answer"}
-            </Button>
-          ) : null}
-
           {currentQuestion.isCorrect || currentQuestion.isLocked ? (
             <div className="flex flex-col gap-2">
               <Button
