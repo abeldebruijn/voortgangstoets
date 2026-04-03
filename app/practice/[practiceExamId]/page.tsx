@@ -14,6 +14,10 @@ import { SignInButton } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
+import {
+  RetryMenuContent,
+  type RetryMenuValues,
+} from "@/components/retry-menu-content";
 import { optionLetter } from "@/lib/practice";
 
 type PracticeExamState = {
@@ -38,6 +42,93 @@ type PracticeExamState = {
     feedbackSource: string | null;
   } | null;
 };
+
+function ScoreDial({ correct, total }: { correct: number; total: number }) {
+  const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const [displayPercentage, setDisplayPercentage] = useState(0);
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  const dialColor =
+    displayPercentage <= 33
+      ? "rgb(239 68 68)"
+      : displayPercentage <= 66
+        ? "rgb(251 146 60)"
+        : "rgb(34 197 94)";
+  const dialTrackColor =
+    displayPercentage <= 33
+      ? "rgb(239 68 68 / 0.14)"
+      : displayPercentage <= 66
+        ? "rgb(251 146 60 / 0.14)"
+        : "rgb(34 197 94 / 0.14)";
+  const dashOffset =
+    circumference -
+    (Math.min(Math.max(displayPercentage, 0), 100) / 100) * circumference;
+
+  useEffect(() => {
+    let frameId = 0;
+    const durationMs = 900;
+    const startedAt = performance.now();
+
+    setDisplayPercentage(0);
+
+    const tick = (now: number) => {
+      const elapsed = now - startedAt;
+      const progress = Math.min(elapsed / durationMs, 1);
+      const eased = 1 - (1 - progress) * (1 - progress);
+
+      setDisplayPercentage(Math.round(percentage * eased));
+
+      if (progress < 1) {
+        frameId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [percentage]);
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="relative h-36 w-36">
+        <svg
+          viewBox="0 0 140 140"
+          className="-rotate-90 h-full w-full"
+          aria-label={`Score ${percentage} percent`}
+        >
+          <circle
+            cx="70"
+            cy="70"
+            r={radius}
+            fill="none"
+            stroke={dialTrackColor}
+            strokeWidth="8"
+          />
+          <circle
+            cx="70"
+            cy="70"
+            r={radius}
+            fill="none"
+            stroke={dialColor}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+          />
+        </svg>
+        <div
+          className="absolute inset-0 flex items-center justify-center text-4xl font-semibold"
+          style={{ color: dialColor }}
+        >
+          {displayPercentage}
+        </div>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Score {correct} / {total}
+      </p>
+    </div>
+  );
+}
 
 export default function PracticeExamPage() {
   return (
@@ -69,7 +160,10 @@ function PracticeExamPlayer() {
   }) as PracticeExamState | null | undefined;
   const markStarted = useMutation(api.practiceExams.markPracticeExamStarted);
   const submitAnswer = useMutation(api.practiceExams.submitAnswer);
-  const advanceToNextQuestion = useMutation(api.practiceExams.advanceToNextQuestion);
+  const retryPracticeExam = useMutation(api.practiceExams.retryPracticeExam);
+  const advanceToNextQuestion = useMutation(
+    api.practiceExams.advanceToNextQuestion,
+  );
   const generateWrongAnswerFeedback = useAction(
     api.practiceFeedback.generateWrongAnswerFeedback,
   );
@@ -85,6 +179,11 @@ function PracticeExamPlayer() {
     questionId: string;
     seconds: number;
   } | null>(null);
+  const [jitterState, setJitterState] = useState<{
+    questionId: string;
+    optionIndex: number;
+    nonce: number;
+  } | null>(null);
 
   useEffect(() => {
     if (data?.status === "not_started") {
@@ -94,10 +193,12 @@ function PracticeExamPlayer() {
 
   const currentQuestion = data?.currentQuestion ?? null;
   const selectedOptionIndex = currentQuestion
-    ? (selectedAnswers[currentQuestion.id] ?? currentQuestion.selectedOptionIndex ?? null)
+    ? (selectedAnswers[currentQuestion.id] ??
+      currentQuestion.selectedOptionIndex ??
+      null)
     : null;
   const feedbackOverride = currentQuestion
-    ? feedbackOverrides[currentQuestion.id] ?? null
+    ? (feedbackOverrides[currentQuestion.id] ?? null)
     : null;
   const secondsRemaining =
     currentQuestion && currentQuestion.isCorrect
@@ -139,10 +240,31 @@ function PracticeExamPlayer() {
     }, 1000);
 
     return () => window.clearTimeout(timeout);
-  }, [advanceToNextQuestion, currentQuestion, practiceExamId, secondsRemaining]);
+  }, [
+    advanceToNextQuestion,
+    currentQuestion,
+    practiceExamId,
+    secondsRemaining,
+  ]);
 
-  const feedbackText = feedbackOverride?.text ?? currentQuestion?.feedbackText ?? null;
-  const feedbackSource = feedbackOverride?.source ?? currentQuestion?.feedbackSource ?? null;
+  useEffect(() => {
+    if (!jitterState) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setJitterState((current) =>
+        current?.nonce === jitterState.nonce ? null : current,
+      );
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [jitterState]);
+
+  const feedbackText =
+    feedbackOverride?.text ?? currentQuestion?.feedbackText ?? null;
+  const feedbackSource =
+    feedbackOverride?.source ?? currentQuestion?.feedbackSource ?? null;
   const submitDisabled =
     !currentQuestion ||
     selectedOptionIndex === null ||
@@ -165,29 +287,59 @@ function PracticeExamPlayer() {
     return null;
   }, [currentQuestion]);
 
+  const handleRetry = async (values: RetryMenuValues) => {
+    const result = await retryPracticeExam({
+      practiceExamId,
+      otherQuestions: values.otherQuestions,
+      questionAmount: values.questionAmount,
+      allowRetries: values.allowRetries,
+      questionSelectionMode: values.questionSelectionMode,
+    });
+
+    router.push(`/practice/${result.practiceExamId}`);
+  };
+
   if (!data) {
-    return <p className="text-sm text-muted-foreground">Loading practice exam...</p>;
+    return (
+      <p className="text-sm text-muted-foreground">Loading practice exam...</p>
+    );
   }
 
   if (!currentQuestion) {
     return (
-      <div className="flex flex-col gap-4 rounded-2xl border bg-background p-6">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              Practice exam
-            </p>
-            <h1 className="text-2xl font-semibold">{data.examName}</h1>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 rounded-2xl border bg-background p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl font-semibold">{data.examName}</h1>
+            </div>
+            <Button variant="outline" onClick={() => router.push("/")}>
+              Back to dashboard
+            </Button>
           </div>
-          <Button variant="outline" onClick={() => router.push("/")}>
-            Back to dashboard
-          </Button>
+          {data.status === "completed" ? (
+            <div className="flex flex-col items-center gap-2 py-2">
+              <ScoreDial
+                correct={data.correctFirstTryCount}
+                total={data.questionCount}
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              This practice exam is not available.
+            </p>
+          )}
         </div>
-        <p className="text-sm text-muted-foreground">
-          {data.status === "completed"
-            ? `Completed. Score: ${data.correctFirstTryCount} / ${data.questionCount}.`
-            : "This practice exam is not available."}
-        </p>
+        {data.status === "completed" ? (
+          <section className="flex flex-col gap-3 rounded-2xl border bg-background p-5 sm:p-6">
+            <RetryMenuContent
+              practiceExamId={data.id}
+              defaultQuestionAmount={data.questionCount}
+              defaultAllowRetries={data.allowRetries}
+              onSubmit={handleRetry}
+            />
+          </section>
+        ) : null}
       </div>
     );
   }
@@ -196,13 +348,7 @@ function PracticeExamPlayer() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            Practice exam
-          </p>
           <h1 className="text-2xl font-semibold">{data.examName}</h1>
-          <p className="text-sm text-muted-foreground">
-            Question {currentQuestion.questionNumber} of {data.questionCount}
-          </p>
         </div>
         <Button variant="outline" onClick={() => router.push("/")}>
           Dashboard
@@ -211,9 +357,14 @@ function PracticeExamPlayer() {
 
       <section className="flex flex-col gap-5 rounded-2xl border bg-background p-5 sm:p-6">
         <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted-foreground">
-            Score {data.correctFirstTryCount} / {data.questionCount}
-          </p>
+          <div className="flex gap-4 justify-between">
+            <p className="text-sm text-muted-foreground">
+              Question {currentQuestion.questionNumber} of {data.questionCount}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Score {data.correctFirstTryCount} / {data.questionCount}
+            </p>
+          </div>
           <h2 className="text-lg font-semibold leading-relaxed">
             {currentQuestion.question}
           </h2>
@@ -222,11 +373,16 @@ function PracticeExamPlayer() {
         <div className="flex flex-col gap-2">
           {currentQuestion.options.map((option, index) => {
             const isSelected = selectedOptionIndex === index;
-            const isDisabled = currentQuestion.isLocked || currentQuestion.isCorrect;
+            const isDisabled =
+              currentQuestion.isLocked || currentQuestion.isCorrect;
+            const isCorrectSelection = currentQuestion.isCorrect && isSelected;
+            const isJittering =
+              jitterState?.questionId === currentQuestion.id &&
+              jitterState.optionIndex === index;
 
             return (
               <button
-                key={`${currentQuestion.id}-${index}`}
+                key={`${currentQuestion.id}-${index}-${isJittering ? jitterState.nonce : 0}`}
                 type="button"
                 disabled={isDisabled}
                 onClick={() =>
@@ -237,9 +393,18 @@ function PracticeExamPlayer() {
                 }
                 className={[
                   "flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors",
-                  isSelected ? "border-primary bg-primary/5" : "border-border",
+                  isCorrectSelection
+                    ? "border-green-600 bg-green-50 text-green-900"
+                    : isSelected
+                      ? "border-primary bg-primary/5"
+                      : "border-border",
                   isDisabled ? "cursor-default" : "hover:bg-muted/50",
                 ].join(" ")}
+                style={
+                  isJittering
+                    ? { animation: "answer-jitter 320ms ease-in-out 1" }
+                    : undefined
+                }
               >
                 <span className="font-medium">{optionLetter(index)}.</span>
                 <span>{option}</span>
@@ -250,44 +415,64 @@ function PracticeExamPlayer() {
 
         <div className="flex flex-col gap-3">
           {!currentQuestion.isLocked && !currentQuestion.isCorrect ? (
-            <Button disabled={submitDisabled} onClick={() => {
-              if (selectedOptionIndex === null) {
-                return;
-              }
+            <Button
+              disabled={submitDisabled}
+              onClick={() => {
+                if (selectedOptionIndex === null) {
+                  return;
+                }
 
-              startSubmitTransition(async () => {
-                const result = await submitAnswer({
-                  practiceExamId,
-                  questionId: currentQuestion.id,
-                  selectedOptionIndex,
-                });
-
-                if (result.outcome === "incorrect" && result.needsAiFeedback) {
-                  const feedback = await generateWrongAnswerFeedback({
+                startSubmitTransition(async () => {
+                  const result = await submitAnswer({
                     practiceExamId,
                     questionId: currentQuestion.id,
                     selectedOptionIndex,
                   });
 
-                  setFeedbackOverrides((current) => ({
-                    ...current,
-                    [currentQuestion.id]: {
-                      text: feedback.feedbackText,
-                      source: feedback.feedbackSource,
-                    },
-                  }));
-                } else if (result.feedbackText) {
-                  const feedbackText = result.feedbackText;
-                  setFeedbackOverrides((current) => ({
-                    ...current,
-                    [currentQuestion.id]: {
-                      text: feedbackText,
-                      source: result.feedbackSource ?? "feedback",
-                    },
-                  }));
-                }
-              });
-            }}>
+                  if (result.outcome === "incorrect") {
+                    setJitterState((current) => ({
+                      questionId: currentQuestion.id,
+                      optionIndex: selectedOptionIndex,
+                      nonce: (current?.nonce ?? 0) + 1,
+                    }));
+                  }
+
+                  if (
+                    result.outcome === "incorrect" &&
+                    result.needsAiFeedback
+                  ) {
+                    const feedback = await generateWrongAnswerFeedback({
+                      practiceExamId,
+                      questionId: currentQuestion.id,
+                      selectedOptionIndex,
+                    });
+
+                    setFeedbackOverrides((current) => ({
+                      ...current,
+                      [currentQuestion.id]: {
+                        text: feedback.feedbackText,
+                        source: feedback.feedbackSource,
+                      },
+                    }));
+                  } else if (result.outcome === "correct") {
+                    setFeedbackOverrides((current) => {
+                      const next = { ...current };
+                      delete next[currentQuestion.id];
+                      return next;
+                    });
+                  } else if (result.feedbackText) {
+                    const feedbackText = result.feedbackText;
+                    setFeedbackOverrides((current) => ({
+                      ...current,
+                      [currentQuestion.id]: {
+                        text: feedbackText,
+                        source: result.feedbackSource ?? "feedback",
+                      },
+                    }));
+                  }
+                });
+              }}
+            >
               {isSubmitting ? "Checking..." : "Submit answer"}
             </Button>
           ) : null}
@@ -326,7 +511,7 @@ function PracticeExamPlayer() {
             <p className="font-medium">
               {answerTone === "correct" ? "Correct." : "Not correct."}
             </p>
-            {feedbackText ? (
+            {answerTone === "incorrect" && feedbackText ? (
               <p className="mt-1 text-muted-foreground">
                 {feedbackText}
                 {feedbackSource ? ` (${feedbackSource})` : ""}

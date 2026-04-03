@@ -254,21 +254,26 @@ export const dashboard = query({
     }
 
     const examQuestionCount = new Map<Id<"exams">, number>();
+    const answerableQuestionCount = new Map<Id<"exams">, number>();
 
     for (const exam of exams) {
-      let count = 0;
+      let totalCount = 0;
+      let usableCount = 0;
 
       for await (const question of ctx.db
         .query("questions")
         .withIndex("by_exam_and_number", (queryBuilder) =>
           queryBuilder.eq("exam", exam._id),
         )) {
+        totalCount += 1;
+
         if (question.answer !== undefined) {
-          count += 1;
+          usableCount += 1;
         }
       }
 
-      examQuestionCount.set(exam._id, count);
+      examQuestionCount.set(exam._id, totalCount);
+      answerableQuestionCount.set(exam._id, usableCount);
     }
 
     if (!identity) {
@@ -277,7 +282,10 @@ export const dashboard = query({
         allExams: exams.map((exam) => ({
           id: exam._id,
           name: exam.name,
+          year: exam.year,
+          month: exam.month,
           numberOfQuestions: examQuestionCount.get(exam._id) ?? 0,
+          answerableQuestionCount: answerableQuestionCount.get(exam._id) ?? 0,
         })),
       };
     }
@@ -293,12 +301,14 @@ export const dashboard = query({
       practiceExams.push(practiceExam);
     }
 
-    const examNameById = new Map(exams.map((exam) => [exam._id, exam.name]));
+    const examById = new Map(exams.map((exam) => [exam._id, exam]));
 
     return {
       myPracticeExams: practiceExams.map((practiceExam) => ({
         id: practiceExam._id,
-        examName: examNameById.get(practiceExam.exam) ?? "Unknown exam",
+        examName: examById.get(practiceExam.exam)?.name ?? "Unknown exam",
+        examYear: examById.get(practiceExam.exam)?.year ?? null,
+        examMonth: examById.get(practiceExam.exam)?.month ?? null,
         progress: practiceExam.status,
         scoreCorrect: practiceExam.correctFirstTryCount,
         questionCount: practiceExam.questionCount,
@@ -315,7 +325,10 @@ export const dashboard = query({
       allExams: exams.map((exam) => ({
         id: exam._id,
         name: exam.name,
+        year: exam.year,
+        month: exam.month,
         numberOfQuestions: examQuestionCount.get(exam._id) ?? 0,
+        answerableQuestionCount: answerableQuestionCount.get(exam._id) ?? 0,
       })),
     };
   },
@@ -326,6 +339,7 @@ export const createPracticeExam = mutation({
     examId: v.id("exams"),
     type: v.union(v.literal("multipleChoice"), v.literal("openEnded")),
     allowRetries: v.boolean(),
+    questionAmount: v.number(),
   },
   handler: async (ctx, args) => {
     if (args.type !== "multipleChoice") {
@@ -342,12 +356,14 @@ export const createPracticeExam = mutation({
     const questions = await getExamQuestions(ctx, exam._id);
 
     if (questions.length === 0) {
-      throw new ConvexError("This exam has no questions");
+      throw new ConvexError(
+        "This exam has no answerable multiple-choice questions",
+      );
     }
 
     const questionIds = pickQuestionIds({
       allQuestions: questions,
-      questionAmount: Math.min(20, questions.length),
+      questionAmount: clamp(args.questionAmount, 1, questions.length),
       previousQuestionIds: [],
       selectionMode: "random",
       statsByQuestionId: new Map(),
