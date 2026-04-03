@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Info } from "lucide-react";
 
+import { AllowRetriesTooltip } from "@/components/allow-retries-tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -91,7 +92,10 @@ export function RetryMenuContent({
           checked={allowRetries}
           onChange={(event) => setAllowRetries(event.target.checked)}
         />
-        <span>Herkansingen toestaan</span>
+        <span className="flex w-full items-center justify-between gap-2">
+          <span>Herkansingen toestaan</span>
+          <AllowRetriesTooltip />
+        </span>
       </label>
 
       <label className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">

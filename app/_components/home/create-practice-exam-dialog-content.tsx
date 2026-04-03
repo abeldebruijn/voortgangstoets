@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { AllowRetriesTooltip } from "@/components/allow-retries-tooltip";
 
 import type { ExamRow } from "@/app/util/home";
 
@@ -51,7 +52,10 @@ export function CreatePracticeExamDialogContent({
           checked={allowRetries}
           onChange={(event) => setAllowRetries(event.target.checked)}
         />
-        <span>Herkansingen toestaan</span>
+        <span className="flex w-full items-center justify-between gap-2">
+          <span>Herkansingen toestaan</span>
+          <AllowRetriesTooltip />
+        </span>
       </label>
 
       <div className="flex flex-col gap-1">
