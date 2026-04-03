@@ -8,7 +8,7 @@ import {
   useQuery,
 } from "convex/react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import {
   MyPracticeExamsDataTable,
@@ -52,6 +52,24 @@ type DashboardState = {
   myPracticeExams: MyPracticeExam[];
   allExams: ExamRow[];
 };
+
+function buildCreatePracticeExamHref({
+  examId,
+  allowRetries,
+  questionAmount,
+}: {
+  examId: Id<"exams">;
+  allowRetries: boolean;
+  questionAmount: number;
+}) {
+  const params = new URLSearchParams({
+    examId,
+    allowRetries: String(allowRetries),
+    questionAmount: String(questionAmount),
+  });
+
+  return `/practice/create?${params.toString()}`;
+}
 
 function formatExamLabel(
   name: string,
@@ -106,18 +124,8 @@ function Dashboard() {
   const data = useQuery(api.practiceExams.dashboard, {}) as
     | DashboardState
     | undefined;
-  const router = useRouter();
-  const createPracticeExam = useMutation(api.practiceExams.createPracticeExam);
   const retryPracticeExam = useMutation(api.practiceExams.retryPracticeExam);
-  const [isPending, startTransition] = useTransition();
-  const [createDialogExam, setCreateDialogExam] = useState<ExamRow | null>(
-    null,
-  );
-  const [createAllowRetries, setCreateAllowRetries] = useState(false);
-  const [createType, setCreateType] = useState<"multipleChoice" | "openEnded">(
-    "multipleChoice",
-  );
-  const [createQuestionAmount, setCreateQuestionAmount] = useState(20);
+  const router = useRouter();
 
   if (!data) {
     return (
@@ -126,24 +134,6 @@ function Dashboard() {
   }
 
   const hasMyPracticeExams = data.myPracticeExams.length > 0;
-
-  const handleCreatePracticeExam = () => {
-    if (!createDialogExam || createType !== "multipleChoice") {
-      return;
-    }
-
-    startTransition(async () => {
-      const result = await createPracticeExam({
-        examId: createDialogExam.id,
-        type: createType,
-        allowRetries: createAllowRetries,
-        questionAmount: createQuestionAmount,
-      });
-
-      setCreateDialogExam(null);
-      router.push(`/practice/${result.practiceExamId}`);
-    });
-  };
 
   return (
     <>
@@ -208,20 +198,7 @@ function Dashboard() {
                   </TableCell>
                   <TableCell>{exam.numberOfQuestions}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      disabled={exam.answerableQuestionCount === 0}
-                      onClick={() => {
-                        setCreateDialogExam(exam);
-                        setCreateAllowRetries(false);
-                        setCreateType("multipleChoice");
-                        setCreateQuestionAmount(20);
-                      }}
-                    >
-                      {exam.answerableQuestionCount === 0
-                        ? "No practice exam available"
-                        : "Create practice exam"}
-                    </Button>
+                    <CreatePracticeExamAction exam={exam} />
                   </TableCell>
                 </TableRow>
               ))
@@ -229,87 +206,131 @@ function Dashboard() {
           </TableBody>
         </Table>
       </section>
+    </>
+  );
+}
 
-      <Dialog
-        open={createDialogExam !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setCreateDialogExam(null);
-            setCreateAllowRetries(false);
-            setCreateType("multipleChoice");
-            setCreateQuestionAmount(20);
-          }
-        }}
+function CreatePracticeExamAction({ exam }: { exam: ExamRow }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  const handleCreatePracticeExam = ({
+    allowRetries,
+    questionAmount,
+  }: {
+    allowRetries: boolean;
+    questionAmount: number;
+  }) => {
+    setIsRedirecting(true);
+    setOpen(false);
+    router.push(
+      buildCreatePracticeExamHref({
+        examId: exam.id,
+        allowRetries,
+        questionAmount,
+      }),
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button
+            variant="outline"
+            disabled={exam.answerableQuestionCount === 0}
+          />
+        }
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create practice exam</DialogTitle>
-            <DialogDescription>
-              {createDialogExam
-                ? `Based on ${createDialogExam.name}.`
-                : "Choose how to start your practice session."}
-            </DialogDescription>
-          </DialogHeader>
+        {exam.answerableQuestionCount === 0
+          ? "No practice exam available"
+          : "Create practice exam"}
+      </DialogTrigger>
+      <DialogContent>
+        <CreatePracticeExamDialogContent
+          key={open ? exam.id : "create-practice-exam-closed"}
+          exam={exam}
+          isPending={isRedirecting}
+          onSubmit={handleCreatePracticeExam}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-          <fieldset className="flex flex-col gap-2">
-            <legend className="text-sm font-medium">Type</legend>
-            <label className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
-              <input
-                type="radio"
-                name="practice-type"
-                checked={createType === "multipleChoice"}
-                onChange={() => setCreateType("multipleChoice")}
-              />
-              <span>Multiple choice</span>
-            </label>
-            <label className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm text-muted-foreground">
-              <input type="radio" name="practice-type" disabled />
-              <span>Open ended</span>
-              <span className="text-xs">v1 disabled</span>
-            </label>
-          </fieldset>
+function CreatePracticeExamDialogContent({
+  exam,
+  isPending,
+  onSubmit,
+}: {
+  exam: ExamRow;
+  isPending: boolean;
+  onSubmit: (values: { allowRetries: boolean; questionAmount: number }) => void;
+}) {
+  const [allowRetries, setAllowRetries] = useState(false);
+  const [questionAmount, setQuestionAmount] = useState(20);
 
-          <label className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              checked={createAllowRetries}
-              onChange={(event) => setCreateAllowRetries(event.target.checked)}
-            />
-            <span>Allow retries</span>
-          </label>
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Create practice exam</DialogTitle>
+        <DialogDescription>{`Based on ${exam.name}.`}</DialogDescription>
+      </DialogHeader>
 
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="create-question-amount"
-              className="text-sm font-medium"
-            >
-              Question amount
-            </label>
-            <Input
-              id="create-question-amount"
-              type="number"
-              min={1}
-              value={createQuestionAmount}
-              disabled={createType !== "multipleChoice"}
-              onChange={(event) => {
-                const nextValue = Number(event.target.value);
-                setCreateQuestionAmount(
-                  Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 1,
-                );
-              }}
-            />
-          </div>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-sm font-medium">Type</legend>
+        <div className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
+          <span className="size-4 rounded-full border-4 border-primary" />
+          <span>Multiple choice</span>
+        </div>
+        <div className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm text-muted-foreground">
+          <span className="size-4 rounded-full border border-muted-foreground/40" />
+          <span>Open ended</span>
+          <span className="text-xs">Available in the future</span>
+        </div>
+      </fieldset>
 
-          <DialogFooter showCloseButton>
-            <Button
-              onClick={handleCreatePracticeExam}
-              disabled={isPending || !createDialogExam}
-            >
-              {isPending ? "Creating..." : "Create practice exam"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <label className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
+        <input
+          type="checkbox"
+          checked={allowRetries}
+          onChange={(event) => setAllowRetries(event.target.checked)}
+        />
+        <span>Allow retries</span>
+      </label>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="create-question-amount" className="text-sm font-medium">
+          Question amount
+        </label>
+        <Input
+          id="create-question-amount"
+          type="number"
+          min={1}
+          value={questionAmount}
+          onChange={(event) => {
+            const nextValue = Number(event.target.value);
+            setQuestionAmount(
+              Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 1,
+            );
+          }}
+        />
+      </div>
+
+      <DialogFooter showCloseButton>
+        <Button
+          onClick={() => {
+            onSubmit({
+              allowRetries,
+              questionAmount,
+            });
+          }}
+          disabled={isPending}
+        >
+          {isPending ? "Creating..." : "Create practice exam"}
+        </Button>
+      </DialogFooter>
     </>
   );
 }
